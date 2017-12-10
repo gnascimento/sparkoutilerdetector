@@ -17,8 +17,9 @@ object OutlierDetector {
 
   private final val appName = "Outlier Detector"
 
-  private final val logPath = "/home/gabriel/outliers/" + System.currentTimeMillis()
-
+  //private final val logPath = "/home/gabriel/outliers/" + System.currentTimeMillis()
+  private final val logPath = "hdfs://cluster1:9000/" + System.currentTimeMillis()
+  
   val estruturaCSV = StructType(Array(
     StructField("numAno", StringType),
     StructField("txtDescricao", StringType),
@@ -35,14 +36,15 @@ object OutlierDetector {
 
     var tempoIni = tempoInicial
 
-    val conf = new SparkConf().setAppName("Outlier Detector").setMaster("local[*]")
+    val conf = new SparkConf().setAppName("Outlier Detector")
+            //.setMaster("local[*]")
     val sc = new SparkContext(conf)
 
     val session = SparkSession.builder()
       .appName("Outlier Detector")
-      .config("spark.executor.memory", "1g")
-      .config("spark.executor.cores", "1")
-      .config("spark.driver.memory", "512m")
+      //.config("spark.executor.memory", "1g")
+      //.config("spark.executor.cores", "1")
+      //.config("spark.driver.memory", "512m")
       .config("spark.debug.maxToStringFields", "255")
       .config("spark.eventLog.enabled", "true")
       .getOrCreate()
@@ -54,7 +56,7 @@ object OutlierDetector {
     tempoIni = System.currentTimeMillis()
     val sqlDF = session.read
       .format("jdbc")
-      .option("url", "jdbc:postgresql://asgard/outlier_detection")
+      .option("url", "jdbc:postgresql://192.168.1.111/outlier_detection")
       .option("driver", "org.postgresql.Driver")
       .option("dbtable", "public.despesa")
       .option("user", "mestre")
@@ -69,7 +71,7 @@ object OutlierDetector {
     val sql = "select d.id, d.txNomeParlamentar, d.idecadastro, d.nuCarteiraParlamentar," +
       "    		d.sgUf, d.sgPartido, d.txtDescricao, d.vlrDocumento, d.vlrGlosa," +
       "    		d.vlrDocumento -  d.vlrGlosa as despesa, d.numMes, d.numAno FROM DESPESA d" +
-      "				where d.numAno BETWEEN '2012' AND '2015'"
+      "				where d.numAno BETWEEN '2013' AND '2016'"
 
     val result = session.sql(sql)
     result.createOrReplaceTempView("DESPESA_FILTRADA")
@@ -99,7 +101,7 @@ object OutlierDetector {
       .reduceByKey((x, y) => ((x._1 + y._1), (x._2 + y._2)))
 
     //(numAno, txtDescricao) , (despesa, numElementos, media)
-    val despesasSumCountMean = despesasSumCount.map(x => ((x._1._1, x._1._2), (x._2._1, x._2._2, x._2._1 / x._2._2)))
+    val despesasSumCountMean = despesasSumCount.map(x => ((x._1._1, x._1._2), (x._2._1, x._2._2, x._2._1 / x._2._2))).persist()
     
     tempoFim = System.currentTimeMillis()
     execucao += Execucao("CALCULA_MEDIA_COUNT_GR_ANO_TIPO", "Calcula media e numero elementos por ano e descricao da despesa", tempoIni, tempoFim)
@@ -151,11 +153,11 @@ object OutlierDetector {
       val min = despesas(0)._2._1
       val max = despesas(despesas.length - 1)._2._1
 
-      val q1Position = Math.floor(despesas.length * 0.25).intValue()
-      val q2Position = Math.floor(despesas.length * 0.5).intValue()
-      val q3Position = Math.floor(despesas.length * 0.75).intValue()
+      val q1Position = Math.floor((despesas.length -1) * 0.25).intValue()
+      val q2Position = Math.floor((despesas.length -1) * 0.5).intValue()
+      val q3Position = Math.floor((despesas.length -1) * 0.75).intValue()
 
-      val q1 = despesas(q1Position)._2._1
+      val q1 = despesas(q1Position)._2._1 
       val q2 = despesas(q2Position)._2._1
       val q3 = despesas(q3Position)._2._1
       
